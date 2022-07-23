@@ -1,0 +1,224 @@
+
+COVID Data Insertion 
+
+--- Drop Table Commands ---
+Drop table house cascade constraints;
+Drop table person cascade constraints;
+Drop table person_flight cascade constraints;
+Drop table flight cascade constraints;
+Drop table event cascade constraints;
+Drop table person_event cascade constraints;
+Drop table past_test cascade constraints;
+
+--- patient/house information ---
+CREATE TABLE house(
+hid int NOT NULL,       --- house ID
+haddress char(50),      --- house address
+zipcode int,            --- zipcode
+PRIMARY KEY (hid));
+
+--- House Data Insertion ---
+insert into house values(1, '1000 Blake Road', 21227);
+insert into house values(2, '122 Book Road', 21044);
+insert into house values(3, '420 Yosemite Street', 21035);
+
+CREATE TABLE person(
+Pid int NOT NULL,       --- person id
+Hid int,                --- house id
+Firstname varchar(20),
+Lastname varchar(20),
+Phonenumber int,
+Status int,             --- 1 positive, 0 negative
+PRIMARY KEY (pid),
+FOREIGN KEY (hid) references house);
+
+--- Patient Data Insertion ---
+insert into person values(1, 3, 'Jake', 'Martin', 4436789345, 0);
+insert into person values(2, 1, 'Maria', 'Jackson', 4437831234, 1);
+insert into person values(3, 2, 'Jose', 'Cuervo', 4107154468, 1);
+insert into person values(4, 2, 'Steve', 'Williams', 4436762347, 0);
+
+--- flights ---
+CREATE TABLE flight(
+fid int NOT NULL,       --- flight ID
+fdate date,             --- flight date
+fnum varchar(50),
+PRIMARY KEY (fid));
+
+--- Flight Data Insertion ---
+insert into flight values(1, date '2021-1-12', 'AA455');
+insert into flight values(2, date '2021-1-20', 'AA289');
+insert into flight values(3, date '2021-2-16', 'SW680');
+
+CREATE TABLE person_flight(
+pid int,
+fid int,
+PRIMARY KEY(pid,fid),
+FOREIGN KEY(pid) references person,
+FOREIGN KEY(fid) references flight);
+
+--- Patient-Flight Data Insertion ---
+insert into person_flight values(2,3);
+insert into person_flight values(2,2);
+insert into person_flight values(1,1);
+insert into person_flight values(4,2);
+
+--- events ---
+CREATE TABLE event(
+eid int NOT NULL,       --- Event ID
+ename varchar(50),      --- Event Name
+edate date,             --- Event date
+eaddress varchar(50),   --- Event address
+PRIMARY KEY (eid));
+
+--- Event Data Insertion ---
+insert into event values(1, 'Joe Birthday Party', date '2021-2-26', '585 Huntington Road');
+insert into event values(2, 'The Districts Concert', date '2021-1-10', '289 Manhattan Street');
+insert into event values(3, 'New Years Party', date '2020-12-31', '410 Baltimore Parkway');
+
+CREATE TABLE person_event(
+pid int,                --- patient ID
+eid int,                --- event ID
+PRIMARY KEY(pid,eid),
+FOREIGN KEY(pid) references person,
+FOREIGN KEY(eid) references event);
+
+--- Patient-Event Data Insertion ---
+insert into person_event values(3, 2);
+insert into person_event values(3, 3);
+insert into person_event values(2, 1);
+
+--- past tests ---
+CREATE TABLE past_test(
+tid int NOT NULL,       --- Test ID
+pid int,                --- person ID
+apptdate DATE NOT NULL, --- Appointment Date
+result int,             --- 1 positive, 0 negative
+Primary key(tid),
+FOREIGN KEY(pid) references person);
+
+--- Past Test Data Insertion ---
+insert into past_test values(1, 3, date '2021-2-14', 1);
+insert into past_test values(2, 3, date '2020-9-24', 0);
+insert into past_test values(3, 2, date '2021-2-15', 1);
+insert into past_test values(4, 1, date '2021-3-7', 0);
+insert into past_test values(5, 1, date '2021-4-1', 1);
+
+commit;
+
+Feature 1: add a house to the database. Input includes house address and zip code.
+Please do the following:
+1) first check whether there exists a house with same address and zip code, if so print a message 'the house already exists!'
+2) otherwise, insert the house into house table and print out new house ID.
+
+-- FEATURE 1 - GIO
+-- create sequence for house id
+drop sequence h_seq;
+create sequence h_seq start with 4; --starts with 4
+
+create or replace procedure add_house(
+   v_address in house.haddress%type,
+   v_zip in house.zipcode%type)
+as
+   h_count number := 0;
+begin
+   select count(*) into h_count from house
+       where haddress = v_address and zipcode = v_zip;
+-- if else statement
+   if (h_count > 0) then
+       dbms_output.put_line('The house already exists!');
+   else
+       insert into house values (H_SEQ.nextval,v_address, v_zip);
+       dbms_output.put_line('New house has been added with ID: ' || h_seq.currval);
+   end if;
+end;
+
+/
+Set serveroutput ON;
+call add_house('10 Candice Road', 21220); -- Regular Case
+call add_house('1000 Blake Road', 21227); -- Special Case (House exists)
+
+select * from house order by hid; --show the house table
+delete from house where hid = 4; --delete the house that has hid of 4
+commit;
+
+
+
+
+Feature 2: add a person to an existing house, including name of person, house ID, phone#, and set status to null. Please do the following:
+1) check if a person already exists with same name and phone#. If so, print a message: 'person already exists!'
+2) otherwise, check whether there is a house with given ID. If so, just insert a row into person table with input name, phone number, the given house ID, and status as null. Otherwise print a message 'No such house!'. 
+
+
+-- create sequence to generate person id
+drop sequence p_seq;
+create sequence p_seq start with 5;
+
+create or replace procedure add_person(
+    v_hid in person.hid%type,
+    v_fname in person.firstname%type,
+    v_lastname in person.lastname%type,
+    v_phonenumber in person.phonenumber%type
+    )
+as 
+    p_count number := 0;
+    h_count number := 0;
+begin
+    select count(*) into p_count from person
+        where firstname = v_fname and phonenumber = v_phonenumber and lastname = v_lastname;
+    select count(*) into h_count from person p
+    inner join house h
+            on p.hid = h.hid
+        where p.hid = v_hid;
+-- if else statement        
+    if (p_count > 0) then 
+        dbms_output.put_line('The person already exists!');
+    elsif (h_count = 0) then
+        dbms_output.put_line('No such house!');
+    else
+        dbms_output.put_line('New person have been created!');
+        insert into person 
+        values (p_seq.nextval, v_hid, v_fname, v_lastname, v_phonenumber, null);
+    end if;   
+end;
+/  
+-- exec add_person
+set serveroutput on;
+call add_person(1, 'Jay', 'Martinez', 4436789348); -- Normal Case: create person record
+call add_person(2, 'Jake', 'Martin', 4436789345);    -- Special case: person already exists!
+call add_person(110, 'Eri', 'Powell', 4434444555);    -- Special case: no such house!
+
+select * from person;   -- to view the record
+
+delete from person where pid = 5; -- delete record
+-- reset sequence
+drop sequence p_seq;
+create sequence p_seq start with 5;
+
+
+
+Feature 14: print out names of people who have recovered. A person has recovered if the person tested positive before but the current status is 0 (not positive).
+
+create or replace procedure recoveredPatients as
+    v_count int;
+-- create cursor   
+    cursor c1 is select firstname, lastname from person p 
+        where p.status = '0' and p.pid in (select t.pid from past_test t where t.result = 1); 
+-- the subquery will first check if the person tested positive and then negative
+
+begin
+    dbms_output.put_line('These people recovered from COVID-19');
+    select count(*) into v_count from person p 
+        where p.status = '0' and p.pid in (select t.pid from past_test t where t.result = 1); 
+   if v_count = 0 then
+   dbms_output.put_line('none');
+   else
+   for i in c1 loop 
+   dbms_output.put_line(i.firstname || ' ' || i.lastname);
+   end loop;
+   end if;
+end;
+/
+-- exec statement
+set serveroutput on;
+exec recoveredPatients;
